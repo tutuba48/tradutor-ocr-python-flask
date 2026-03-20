@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tradutor de Cardápio</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f0f2f5; }
+        .container { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 90%; max-width: 400px; }
+        h1 { color: #333; font-size: 1.5rem; margin-bottom: 1.5rem; }
+        input[type="file"] { display: none; }
+        .label-upload { background-color: #007bff; color: white; padding: 10px 20px; border-radius: 8px; cursor: pointer; display: inline-block; margin-bottom: 1rem; }
+        #preview { max-width: 100%; height: auto; border-radius: 8px; margin-top: 1rem; display: none; }
+        .result-area { margin-top: 1.5rem; text-align: left; background: #fafafa; padding: 1rem; border-radius: 8px; display: none; }
+        .status { font-weight: bold; color: #555; }
+        .text-box { margin-top: 0.5rem; padding: 0.5rem; border: 1px solid #eee; border-radius: 4px; min-height: 50px; }
+        #speak-btn { background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 1rem; width: 100%; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Tradutor Real</h1>
+    
+    <label for="imageInput" class="label-upload">Bater Foto / Enviar Imagem</label>
+    <input type="file" id="imageInput" accept="image/*" capture="environment">
+    
+    <img id="preview" alt="Sua foto">
+
+    <div class="result-area" id="resultArea">
+        <p class="status" id="statusText">Aguardando imagem...</p>
+        
+        <div class="text-box" id="originalTextBox">
+            <strong>Original:</strong> <span id="textOriginal">...</span>
+        </div>
+        <div class="text-box" id="translatedTextBox">
+            <strong>Português:</strong> <span id="textTranslated">...</span>
+        </div>
+
+        <button id="speak-btn" onclick="falarTexto()">🔊 Ouvir Tradução</button>
+    </div>
+</div>
+
+<script>
+    const imageInput = document.getElementById('imageInput');
+    const preview = document.getElementById('preview');
+    const resultArea = document.getElementById('resultArea');
+    const statusText = document.getElementById('statusText');
+    const textOriginal = document.getElementById('textOriginal');
+    const textTranslated = document.getElementById('textTranslated');
+    const speakBtn = document.getElementById('speak-btn');
+
+    let textoParaFalar = "";
+
+    imageInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Mostra a imagem na tela
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+        resultArea.style.display = 'block';
+        
+        enviarParaServidor(file);
+    });
+
+    function enviarParaServidor(file) {
+        statusText.textContent = "Lendo e traduzindo... aguarde.";
+        speakBtn.style.display = 'none';
+        textOriginal.textContent = "...";
+        textTranslated.textContent = "...";
+
+        // Prepara a imagem para enviar ao Python
+        const formData = new FormData();
+        formData.append('imagem', file);
+
+        // Faz a requisição para o backend local
+        fetch('http://127.0.0.1:5001/traduzir', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.erro) {
+                statusText.textContent = "Erro: " + data.erro;
+            } else {
+                statusText.textContent = "Concluído!";
+                textOriginal.textContent = data.original;
+                textTranslated.textContent = data.traduzido;
+                textoParaFalar = data.traduzido;
+                speakBtn.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            statusText.textContent = "Erro de conexão com o servidor Python.";
+        });
+    }
+
+    function falarTexto() {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(textoParaFalar);
+            utterance.lang = 'pt-BR';
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+</script>
+
+</body>
+</html>
